@@ -1,0 +1,25 @@
+# # create miniconda virtual machine (linux)
+cd /tmp
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+sh Miniconda3-latest-Linux-x86_64.sh -b
+/home/hsiehpinghan/miniconda3/bin/conda create --name mmcls python=3.7
+export MINICONDA_HOME=/home/hsiehpinghan/miniconda3
+export PATH=$MINICONDA_HOME/bin:$PATH
+conda init bash
+conda activate mmcls
+conda install -c anaconda pytest
+conda install -c pytorch pytorch torchvision cpuonly
+pip install -r requirements.txt
+pip install mmcv-full==1.4.2
+pip install timm
+
+# start miniconda jupyter notebook (linux)
+export ANACONDA_HOME=/home/hsiehpinghan/anaconda3
+export PATH=$ANACONDA_HOME/bin:$PATH
+cd /home/hsiehpinghan/git/mmclassification/notebook
+conda activate mmcls
+jupyter notebook
+
+# install mmcls
+cd /home/hsiehpinghan/git/mmclassification
+pip install -e .
