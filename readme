@@ -23,3 +23,33 @@ jupyter notebook
 # install mmcls
 cd /home/hsiehpinghan/git/mmclassification
 pip install -e .
+
+# Model zoo
+2014/09/04 VGG
+    1. using (3×3) convolution filters pushing the depth to 16–19 weight layers.
+2015/12/10 ResNet
+    1. Addressing the degradation problem by introducing a deep residual learning framework.
+2016/11/16 ResNeXt
+    1. This strategy exposes a new dimension,
+       which we call "cardinality" (the size of the set of transformations),
+       as an essential factor in addition to the dimensions of depth and width.
+2017/09/05 SE-ResNet
+2017/09/05 SE-ResNeXt
+2020/03/30 RegNet
+2017/07/04 ShuffleNetV1
+2018/07/30 ShuffleNetV2
+2018/01/13 MobileNetV2
+2019/05/06 MobileNetV3
+2021/03/25 Swin-Transformer
+2021/01/11 RepVGG
+2020/10/22 Vision-Transformer
+2021/02/27 Transformer-in-Transformer
+2019/04/02 Res2Net
+2021/05/04 MLP-Mixer
+2020/12/23 DeiT
+2021/05/09 Conformer
+2021/01/28 T2T-ViT
+2021/04/28 Twins
+2019/05/28 EfficientNet
+2022/01/10 ConvNeXt
+2019/08/20 HRNet
