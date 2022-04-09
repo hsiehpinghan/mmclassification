@@ -8,7 +8,20 @@ import numpy as np
 import pytest
 
 from mmcls.datasets import (BaseDataset, ClassBalancedDataset, ConcatDataset,
-                            RepeatDataset)
+                            KFoldDataset, RepeatDataset)
+
+
+def mock_evaluate(results,
+                  metric='accuracy',
+                  metric_options=None,
+                  indices=None,
+                  logger=None):
+    return dict(
+        results=results,
+        metric=metric,
+        metric_options=metric_options,
+        indices=indices,
+        logger=logger)
 
 
 @patch.multiple(BaseDataset, __abstractmethods__=set())
@@ -23,6 +36,9 @@ def construct_toy_multi_label_dataset(length):
     dataset.data_infos = MagicMock()
     dataset.data_infos.__len__.return_value = length
     dataset.get_cat_ids = MagicMock(side_effect=lambda idx: cat_ids_list[idx])
+    dataset.get_gt_labels = \
+        MagicMock(side_effect=lambda: np.array(cat_ids_list))
+    dataset.evaluate = MagicMock(side_effect=mock_evaluate)
     return dataset, cat_ids_list
 
 
@@ -35,6 +51,9 @@ def construct_toy_single_label_dataset(length):
     dataset.data_infos = MagicMock()
     dataset.data_infos.__len__.return_value = length
     dataset.get_cat_ids = MagicMock(side_effect=lambda idx: cat_ids_list[idx])
+    dataset.get_gt_labels = \
+        MagicMock(side_effect=lambda: np.array(cat_ids_list))
+    dataset.evaluate = MagicMock(side_effect=mock_evaluate)
     return dataset, cat_ids_list
 
 
@@ -107,3 +126,67 @@ def test_class_balanced_dataset(construct_dataset):
     for idx in np.random.randint(0, len(repeat_factor_dataset), 3):
         assert repeat_factor_dataset[idx] == bisect.bisect_right(
             repeat_factors_cumsum, idx)
+
+
+@pytest.mark.parametrize('construct_dataset', [
+    'construct_toy_multi_label_dataset', 'construct_toy_single_label_dataset'
+])
+def test_kfold_dataset(construct_dataset):
+    construct_toy_dataset = eval(construct_dataset)
+    dataset, cat_ids_list = construct_toy_dataset(10)
+
+    # test without random seed
+    train_datasets = [
+        KFoldDataset(dataset, fold=i, num_splits=3, test_mode=False)
+        for i in range(5)
+    ]
+    test_datasets = [
+        KFoldDataset(dataset, fold=i, num_splits=3, test_mode=True)
+        for i in range(5)
+    ]
+
+    assert sum([i.indices for i in test_datasets], []) == list(range(10))
+    for train_set, test_set in zip(train_datasets, test_datasets):
+        train_samples = [train_set[i] for i in range(len(train_set))]
+        test_samples = [test_set[i] for i in range(len(test_set))]
+        assert set(train_samples + test_samples) == set(range(10))
+
+    # test with random seed
+    train_datasets = [
+        KFoldDataset(dataset, fold=i, num_splits=3, test_mode=False, seed=1)
+        for i in range(5)
+    ]
+    test_datasets = [
+        KFoldDataset(dataset, fold=i, num_splits=3, test_mode=True, seed=1)
+        for i in range(5)
+    ]
+
+    assert sum([i.indices for i in test_datasets], []) != list(range(10))
+    assert set(sum([i.indices for i in test_datasets], [])) == set(range(10))
+    for train_set, test_set in zip(train_datasets, test_datasets):
+        train_samples = [train_set[i] for i in range(len(train_set))]
+        test_samples = [test_set[i] for i in range(len(test_set))]
+        assert set(train_samples + test_samples) == set(range(10))
+
+    # test behavior of get_cat_ids method
+    for train_set, test_set in zip(train_datasets, test_datasets):
+        for i in range(len(train_set)):
+            cat_ids = train_set.get_cat_ids(i)
+            assert cat_ids == cat_ids_list[train_set.indices[i]]
+        for i in range(len(test_set)):
+            cat_ids = test_set.get_cat_ids(i)
+            assert cat_ids == cat_ids_list[test_set.indices[i]]
+
+    # test behavior of get_gt_labels method
+    for train_set, test_set in zip(train_datasets, test_datasets):
+        for i in range(len(train_set)):
+            gt_label = train_set.get_gt_labels()[i]
+            assert gt_label == cat_ids_list[train_set.indices[i]]
+        for i in range(len(test_set)):
+            gt_label = test_set.get_gt_labels()[i]
+            assert gt_label == cat_ids_list[test_set.indices[i]]
+
+    # test evaluate
+    for test_set in test_datasets:
+        eval_inputs = test_set.evaluate(None)
+        assert eval_inputs['indices'] == test_set.indices

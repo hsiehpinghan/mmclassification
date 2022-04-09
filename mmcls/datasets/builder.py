@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import copy
 import platform
 import random
 from functools import partial
@@ -24,16 +25,27 @@ SAMPLERS = Registry('sampler')
 
 
 def build_dataset(cfg, default_args=None):
-    from .dataset_wrappers import (ConcatDataset, RepeatDataset,
-                                   ClassBalancedDataset)
+    from .dataset_wrappers import (ClassBalancedDataset, ConcatDataset,
+                                   KFoldDataset, RepeatDataset)
     if isinstance(cfg, (list, tuple)):
         dataset = ConcatDataset([build_dataset(c, default_args) for c in cfg])
+    elif cfg['type'] == 'ConcatDataset':
+        dataset = ConcatDataset(
+            [build_dataset(c, default_args) for c in cfg['datasets']],
+            separate_eval=cfg.get('separate_eval', True))
     elif cfg['type'] == 'RepeatDataset':
         dataset = RepeatDataset(
             build_dataset(cfg['dataset'], default_args), cfg['times'])
     elif cfg['type'] == 'ClassBalancedDataset':
         dataset = ClassBalancedDataset(
             build_dataset(cfg['dataset'], default_args), cfg['oversample_thr'])
+    elif cfg['type'] == 'KFoldDataset':
+        cp_cfg = copy.deepcopy(cfg)
+        if cp_cfg.get('test_mode', None) is None:
+            cp_cfg['test_mode'] = (default_args or {}).pop('test_mode', False)
+        cp_cfg['dataset'] = build_dataset(cp_cfg['dataset'], default_args)
+        cp_cfg.pop('type')
+        dataset = KFoldDataset(**cp_cfg)
     else:
         dataset = build_from_cfg(cfg, DATASETS, default_args)
 
@@ -92,7 +104,8 @@ def build_dataloader(dataset,
         sampler = build_sampler(
             sampler_cfg,
             default_args=dict(
-                dataset=dataset, num_replicas=world_size, rank=rank))
+                dataset=dataset, num_replicas=world_size, rank=rank,
+                seed=seed))
     # Default sampler logic
     elif dist:
         sampler = build_sampler(
@@ -102,7 +115,8 @@ def build_dataloader(dataset,
                 num_replicas=world_size,
                 rank=rank,
                 shuffle=shuffle,
-                round_up=round_up))
+                round_up=round_up,
+                seed=seed))
     else:
         sampler = None
 
@@ -144,6 +158,7 @@ def worker_init_fn(worker_id, num_workers, rank, seed):
     worker_seed = num_workers * rank + worker_id + seed
     np.random.seed(worker_seed)
     random.seed(worker_seed)
+    torch.manual_seed(worker_seed)
 
 
 def build_sampler(cfg, default_args=None):
