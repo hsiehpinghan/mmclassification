@@ -110,6 +110,13 @@ def parse_args():
 
 
 if __name__ == '__main__':
+    import sys
+    sys.argv = [sys.argv[0]]
+    sys.argv += ['/home/hsiehpinghan/git/mmclassification/configs/efficientnet/efficientnet-b0_8xb32-01norm_front_id_card.py']
+    sys.argv += ['--checkpoint', '/home/hsiehpinghan/git/mmclassification/checkpoint/best_accuracy_top-1_epoch_96.pth']
+    sys.argv += ['--verify']
+    sys.argv += ['--output-file', '/tmp/efficientnet-b0_8xb32-01norm_front_id_card.pt']
+
     args = parse_args()
 
     if len(args.shape) == 1:
